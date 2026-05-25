@@ -1,25 +1,49 @@
 pipeline {
     agent any
 
+    environment {
+        IMAGE_NAME = "zoya9545/clouddevops-app"
+    }
+
     stages {
 
         stage('Clone Code') {
             steps {
-                git 'https://github.com/zoya9545-web/cloud-devops-project.git'
+                git branch: 'main',
+                credentialsId: 'github-creds',
+                url: 'https://github.com/zoya9545-web/cloud-devops-project.git'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t clouddevops-app .'
+                sh 'docker build -t $IMAGE_NAME .'
             }
         }
 
-        stage('Run Docker Container') {
+        stage('Docker Login') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'docker-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                sh 'docker push $IMAGE_NAME'
+            }
+        }
+
+        stage('Deploy Container') {
             steps {
                 sh 'docker stop clouddevops-container || true'
                 sh 'docker rm clouddevops-container || true'
-                sh 'docker run -d -p 3000:3000 --name clouddevops-container clouddevops-app'
+                sh 'docker run -d -p 3000:3000 --name clouddevops-container $IMAGE_NAME'
             }
         }
     }
